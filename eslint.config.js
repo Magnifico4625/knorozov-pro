@@ -20,5 +20,5 @@ export default ts.config(
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
-  { ignores: ["dist/", "target/", "src-tauri/", "node_modules/", "crates/"] },
+  { ignores: ["dist/", "landing/dist/", "target/", "src-tauri/", "node_modules/", "crates/"] },
 );
