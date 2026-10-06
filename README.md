@@ -23,6 +23,9 @@
 `.exe` для Windows x64, `.dmg` и `.pkg` для Mac с Apple Silicon. См. [руководство по установке](docs/install-ru.md).
 Проверочные сборки доступны в GitHub Actions → последний успешный запуск **CI** → *Artifacts*.
 
+Если GitHub Actions недоступен, установщики можно бесплатно собрать на своём Windows или Mac:
+[инструкция по локальной сборке](docs/build-local-ru.md), команда `pnpm installers`.
+
 ## Для разработчика
 
 ```bash

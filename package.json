@@ -8,6 +8,7 @@
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "lint": "eslint .",
+    "installers": "node scripts/build-installers.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
