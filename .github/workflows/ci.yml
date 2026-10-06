@@ -54,7 +54,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: linux }
       - name: "Rust unit tests (core: exporters, SRT timing, speaker rename, clustering…)"
-        run: cargo test --locked -p knorozov-core --lib
+        shell: bash
+        run: |
+          cargo test --locked -p knorozov-core --lib --no-run
+          TASK_SHERPA_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/sherpa-rs"
+          TASK_SHERPA_LIBRARY=$(find "$TASK_SHERPA_CACHE" -name libsherpa-onnx-c-api.so -print -quit)
+          test -n "$TASK_SHERPA_LIBRARY"
+          export LD_LIBRARY_PATH="$(dirname "$TASK_SHERPA_LIBRARY")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          cargo test --locked -p knorozov-core --lib
 
   build:
     name: Build + test (${{ matrix.name }})
@@ -66,7 +73,7 @@ jobs:
           - name: Windows x64
             os: windows-latest
             slug: windows-x64
-          - name: macOS Apple Silicon
+          - name: macOS Apple Silicon (M1–M4)
             os: macos-15
             slug: macos-arm64
     runs-on: ${{ matrix.os }}
