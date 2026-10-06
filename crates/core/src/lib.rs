@@ -5,6 +5,7 @@ pub mod diarize;
 pub mod export;
 pub mod languages;
 pub mod models;
+pub mod paths;
 pub mod pipeline;
 pub mod timefmt;
 pub mod transcript;

@@ -93,3 +93,49 @@ fn decodes_all_fixtures() {
         assert!(peak > 0.05 && peak <= 1.5, "{f} peak {peak}");
     }
 }
+
+/// Windows users often have Cyrillic profile names (C:\Users\Дамир) — models must still load.
+#[test]
+fn models_load_from_cyrillic_paths() {
+    let Some(m) = model() else { return };
+    let dir = std::env::temp_dir().join(format!("Кнорозов тест {}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let wm = dir.join("модель.bin");
+    std::fs::copy(&m, &wm).unwrap();
+    let engine = asr::Engine::load(&wm).expect("whisper model from Cyrillic path");
+    let pcm = audio::decode_to_16k_mono(&fixtures().join("en_short.mp3"), |_| {}, || false).unwrap();
+    let res = engine
+        .transcribe(
+            &pcm,
+            &asr::AsrOptions { language: "en".into(), threads: None },
+            |_| {},
+            |_| {},
+            Arc::new(AtomicBool::new(false)),
+        )
+        .unwrap();
+    assert!(!res.segments.is_empty());
+
+    #[cfg(feature = "diarization")]
+    {
+        let spk_src = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../src-tauri/resources/models")
+            .join(knorozov_core::diarize::EMBEDDING_MODEL_FILE);
+        let spk = dir.join("спикеры.onnx");
+        std::fs::copy(&spk_src, &spk).unwrap();
+        let mut segs = res.segments.clone();
+        let n = knorozov_core::diarize::assign_speakers(&spk, &pcm, &mut segs, 2, |_| {}, || false)
+            .expect("speaker model from Cyrillic path");
+        assert!(n >= 1);
+    }
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn cancel_stops_transcription() {
+    let Some(m) = model() else { return };
+    let engine = asr::Engine::load(&m).unwrap();
+    let pcm = audio::decode_to_16k_mono(&fixtures().join("dialog.mp3"), |_| {}, || false).unwrap();
+    let cancel = Arc::new(AtomicBool::new(true));
+    let r = engine.transcribe(&pcm, &asr::AsrOptions { language: "auto".into(), threads: None }, |_| {}, |_| {}, cancel);
+    assert!(r.is_err(), "cancelled job must return an error");
+}

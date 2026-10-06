@@ -28,6 +28,10 @@ sha2 = "0.10"
 hex = "0.4"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries"], optional = true }
+memmap2 = "0.9"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
 
 # Static sherpa-onnx/onnxruntime on the shipping platforms (no extra DLL/dylib to bundle).
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]

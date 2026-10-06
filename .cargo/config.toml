@@ -1,0 +1,15 @@
+# Portable whisper.cpp/ggml builds: never compile for the build machine's CPU (-march=native),
+# otherwise binaries built on CI may crash with "illegal instruction" on users' PCs.
+# x86-64 baseline: AVX2 + FMA + F16C (Intel Haswell 2013+ / AMD Excavator 2015+).
+# These GGML_* options are ignored on Apple Silicon.
+[env]
+GGML_NATIVE = "OFF"
+GGML_AVX = "ON"
+GGML_AVX2 = "ON"
+GGML_FMA = "ON"
+GGML_F16C = "ON"
+
+# Static MSVC runtime: matches the static sherpa-onnx libs (/MT) and removes the need for the
+# Visual C++ Redistributable on users' machines.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

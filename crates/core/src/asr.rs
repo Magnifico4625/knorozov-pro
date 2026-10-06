@@ -61,8 +61,11 @@ impl Engine {
         let mut params = WhisperContextParameters::default();
         // Metal is used automatically when the crate is built with the `metal` feature.
         params.flash_attn = cfg!(target_os = "macos");
-        let path = model_path.to_str().ok_or_else(|| anyhow!("некорректный путь к модели"))?;
-        let ctx = WhisperContext::new_with_params(path, params)
+        // Load from a memory map instead of a path: whisper.cpp opens files with the ANSI code
+        // page on Windows, which breaks on Cyrillic user names (C:\Users\Дамир\...).
+        let file = std::fs::File::open(model_path)?;
+        let map = unsafe { memmap2::Mmap::map(&file)? };
+        let ctx = WhisperContext::new_from_buffer_with_params(&map, params)
             .map_err(|e| anyhow!("не удалось загрузить модель: {e:?}"))?;
         Ok(Self { ctx, model_path: model_path.to_path_buf() })
     }

@@ -16,6 +16,38 @@
   let muted = $state(false);
   let rate = $state(1);
   let failed = $state(false);
+  let triedBlob = false;
+  let blobUrl = "";
+  let actualSrc = $state("");
+  $effect(() => {
+    actualSrc = src;
+    triedBlob = false;
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl = "";
+    };
+  });
+
+  // Some WebViews (notably WebKitGTK on Linux) can't stream media from the asset protocol.
+  // Fallback: fetch the file and play it from a Blob URL.
+  let errInfo = $state("");
+  async function onError() {
+    errInfo += ` media:${audio?.error?.code ?? "?"} ${audio?.error?.message ?? ""} src=${actualSrc.slice(0, 60)}`;
+    if (triedBlob) {
+      failed = true;
+      return;
+    }
+    triedBlob = true;
+    try {
+      const r = await fetch(src);
+      if (!r.ok) throw new Error(String(r.status));
+      blobUrl = URL.createObjectURL(await r.blob());
+      actualSrc = blobUrl;
+    } catch (e) {
+      errInfo += ` fetch:${e}`;
+      failed = true;
+    }
+  }
   const rates = [0.75, 1, 1.25, 1.5, 2];
 
   const total = $derived(dur > 0 && isFinite(dur) ? dur : totalMs / 1000);
@@ -55,14 +87,14 @@
 <div class="player card">
   <audio
     bind:this={audio}
-    {src}
+    src={actualSrc}
     preload="metadata"
     ontimeupdate={() => (time = audio!.currentTime)}
     onloadedmetadata={() => ((dur = audio!.duration), (failed = false))}
     onplay={() => (playing = true)}
     onpause={() => (playing = false)}
     onended={() => (playing = false)}
-    onerror={() => (failed = true)}
+    onerror={onError}
   ></audio>
   <button class="play" onclick={toggle} disabled={failed} title={playing ? "Пауза" : "Воспроизвести"}>
     <Icon name={playing ? "pause" : "play"} size={16} />
@@ -71,7 +103,7 @@
     <b>{chip(time * 1000)}</b> <span class="muted">/ {duration(total * 1000)}</span>
   </div>
   {#if failed}
-    <div class="muted fail">Исходный файл недоступен — воспроизведение невозможно, текст можно редактировать и экспортировать.</div>
+    <div class="muted fail" title={errInfo}>Исходный файл недоступен — воспроизведение невозможно, текст можно редактировать и экспортировать.</div>
   {:else}
     <input
       class="scrub"

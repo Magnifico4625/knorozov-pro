@@ -47,7 +47,7 @@
     <div class="info">
       <div class="name" title={app.file?.name}>{app.file?.name ?? "Файл"}</div>
       <div class="muted meta">
-        {app.file?.format ?? ""}{#if app.file?.duration_sec} · {duration(app.file.duration_sec * 1000)}{/if}
+        {app.file?.format ?? ""}{#if app.file?.duration_sec}{" · " + duration(app.file.duration_sec * 1000)}{/if}
       </div>
       <div class="progress"><div style="width: {pct}%"></div></div>
       <div class="stats">
@@ -64,7 +64,7 @@
         <p class="faint">Текст появится здесь по мере распознавания.</p>
       {:else}
         {#each app.segments as s, i (i)}
-          <span class:latest={i === app.segments.length - 1}>{s.text} </span>
+          <span class:latest={i === app.segments.length - 1}>{s.text + " "}</span>
         {/each}
         <span class="caret"></span>
       {/if}

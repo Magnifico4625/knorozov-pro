@@ -183,7 +183,7 @@ mod imp {
         should_cancel: impl Fn() -> bool,
     ) -> Result<usize> {
         let mut extractor = sherpa_rs::speaker_id::EmbeddingExtractor::new(sherpa_rs::speaker_id::ExtractorConfig {
-            model: model.to_string_lossy().into_owned(),
+            model: crate::paths::native_safe_path(model).to_string_lossy().into_owned(),
             provider: Some("cpu".into()),
             num_threads: Some(threads.max(1)),
             debug: false,

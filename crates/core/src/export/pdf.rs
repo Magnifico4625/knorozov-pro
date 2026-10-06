@@ -175,8 +175,8 @@ pub fn to_pdf(t: &Transcript, meta: &DocMeta) -> Result<Vec<u8>> {
     for p in &t.paragraphs {
         let lines = wrap(&m_reg, p.text.trim(), text_size, max_w);
         // keep header with at least two lines of text
-        w.ensure(22.0 + line_h * lines.len().min(2) as f32);
-        w.y += 14.0;
+        w.ensure(28.0 + line_h * lines.len().min(2) as f32);
+        w.y += 20.0;
         let tc = timefmt::chip(p.start_ms);
         w.text(MARGIN_X, 9.0, false, (37, 99, 235), &tc);
         if let Some(name) = t.speaker_name(p.speaker) {
