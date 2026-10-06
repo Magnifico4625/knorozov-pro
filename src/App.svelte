@@ -12,6 +12,7 @@
   import logo from "./assets/logo.png";
 
   let error = $state("");
+  let editor: Editor | undefined = $state();
   onMount(() => {
     init().catch((e) => (error = String(e)));
     // block the browser context menu / file-open on stray drops
@@ -25,7 +26,7 @@
   });
 
   function goHome() {
-    if (app.screen === "editor") app.screen = "main";
+    if (app.screen === "editor") void editor?.leave();
   }
 </script>
 
@@ -54,7 +55,7 @@
     {:else if app.screen === "processing"}
       <Processing />
     {:else if app.screen === "editor"}
-      <Editor />
+      <Editor bind:this={editor} />
     {/if}
   </main>
 

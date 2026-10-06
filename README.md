@@ -19,8 +19,9 @@
 
 ## Установка
 
-См. [docs/install-ru.md](docs/install-ru.md). Сборки: GitHub Actions → последний успешный запуск **CI** →
-раздел *Artifacts* (`Knorozov-PRO-windows-x64`, `Knorozov-PRO-macos-arm64`).
+Установщики опубликованных версий находятся в [Releases](https://github.com/Magnifico4625/knorozov-pro/releases):
+`.exe` для Windows x64, `.dmg` и `.pkg` для Mac с Apple Silicon. См. [руководство по установке](docs/install-ru.md).
+Проверочные сборки доступны в GitHub Actions → последний успешный запуск **CI** → *Artifacts*.
 
 ## Для разработчика
 
@@ -33,8 +34,22 @@ KNOROZOV_TEST_MODEL=/path/ggml-tiny.bin cargo test --release -p knorozov-core   
 cargo run --release -p knorozov-cli -- transcribe model.bin audio.mp3   # CLI для замеров
 ```
 
-Документы: [архитектура](docs/architecture.md) · [замеры скорости](docs/benchmarks.md) ·
-[лицензии](THIRD_PARTY_LICENSES.md).
+## Выпуск установщиков
+
+1. Версия должна совпадать в `package.json`, `src-tauri/tauri.conf.json` и `[workspace.package]` в `Cargo.toml`.
+   Проверка: `node scripts/release-version.mjs`.
+2. Отправьте изменения в `main`. В **Actions → CI → Run workflow** выберите `main` и включите **release**.
+   Также можно отправить тег `v<версия>`: например, `v0.1.0` для версии `0.1.0`.
+3. После проверок, тестов распознавания и сборки на Windows/macOS workflow создаст **черновик Release**
+   с тремя установщиками и `SHA256SUMS.txt`. Черновик виден только участникам с доступом к репозиторию.
+4. Проверьте установку и запуск на обеих платформах, затем откройте черновик в **Releases** и нажмите **Publish release**.
+
+Обычный запуск CI загружает только артефакты. Повторный выпуск той же версии обновляет её черновик;
+опубликованную версию и тег другого коммита workflow не перезаписывает — для них нужна новая версия.
+Подпись Windows и нотарификация macOS пока не настроены.
+Для замеров скорости запустите CI вручную с параметром **bench**; отчёты появятся в артефактах `bench-*`.
+
+Документы: [архитектура](docs/architecture.md) · [лицензии](THIRD_PARTY_LICENSES.md).
 
 Брендинг (иконка, иллюстрации) — `src-tauri/app-icon.png` (→ `pnpm tauri icon src-tauri/app-icon.png -o src-tauri/icons`),
-`src/assets/empty-state.png`, `src/assets/first-launch.png`, `src/assets/logo.png`.
+`src/assets/first-launch.png`, `src/assets/logo.png`; значок файла — `src/components/FileBadge.svelte`.

@@ -3,11 +3,12 @@
   import Icon from "../components/Icon.svelte";
   import { app } from "../lib/state.svelte";
   import { LICENSES } from "../lib/licenses";
+  import { modalDialog } from "../lib/dialog";
   import logo from "../assets/logo.png";
 </script>
 
 <div class="backdrop" role="presentation" onclick={() => (app.aboutOpen = false)}></div>
-<div class="modal card" role="dialog" aria-label="О программе">
+<div class="modal card" role="dialog" aria-modal="true" aria-label="О программе" tabindex="-1" use:modalDialog={() => (app.aboutOpen = false)}>
   <button class="btn ghost icon close" onclick={() => (app.aboutOpen = false)} title="Закрыть"><Icon name="x" /></button>
   <div class="top">
     <img src={logo} alt="" width="64" height="64" />

@@ -71,6 +71,7 @@ export function applyTheme() {
 }
 
 export async function startDownload(qualities: Quality[]) {
+  if (app.download.running) return;
   const missing = qualities.filter((q) => !modelInstalled(q));
   if (!missing.length) return;
   app.download.error = "";
@@ -113,11 +114,11 @@ export async function init() {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
   await Promise.all([refreshModels(), refreshRecent()]);
 
-  on<ModelProgress>("models:progress", (p) => {
+  const modelProgress = on<ModelProgress>("models:progress", (p) => {
     app.download.running = true;
     app.download.progress = p;
   });
-  on<null>("models:done", async () => {
+  const modelDone = on<null>("models:done", async () => {
     app.download.running = false;
     app.download.progress = null;
     await refreshModels();
@@ -128,24 +129,26 @@ export async function init() {
     if (app.screen === "firstrun") app.screen = "main";
     toast("Модели загружены — можно работать офлайн");
   });
-  on<FailInfo>("models:error", async (e) => {
+  const modelError = on<FailInfo>("models:error", async (e) => {
     app.download.running = false;
     app.download.error = e.cancelled ? "" : e.message;
     await refreshModels();
     if (e.cancelled) toast("Загрузка остановлена. Её можно продолжить позже.");
   });
-  on<JobProgress>("job:progress", (p) => (app.progress = p));
-  on<JobSegment>("job:segment", (s) => {
+  const jobProgress = on<JobProgress>("job:progress", (p) => (app.progress = p));
+  const jobSegment = on<JobSegment>("job:segment", (s) => {
     if (s.text.trim()) app.segments.push(s);
   });
-  on<string>("job:done", async (id) => {
+  const jobDone = on<string>("job:done", async (id) => {
     await refreshRecent();
     openProject(id);
   });
-  on<FailInfo>("job:error", (e) => {
+  const jobError = on<FailInfo>("job:error", (e) => {
     app.screen = "main";
     if (!e.cancelled) toast(e.message, "error");
   });
+
+  await Promise.all([modelProgress, modelDone, modelError, jobProgress, jobSegment, jobDone, jobError]);
 
   const anyModel = app.models.some((m) => m.installed);
   app.screen = anyModel ? "main" : "firstrun";

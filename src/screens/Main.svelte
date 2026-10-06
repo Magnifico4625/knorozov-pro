@@ -3,15 +3,16 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open } from "@tauri-apps/plugin-dialog";
   import Icon from "../components/Icon.svelte";
+  import FileBadge from "../components/FileBadge.svelte";
   import { api } from "../lib/api";
   import { app, modelInstalled, openProject, refreshRecent, saveSettings, startDownload, startJob, toast } from "../lib/state.svelte";
   import { date, duration } from "../lib/format";
-  import emptyArt from "../assets/empty-state.png";
 
   let dragging = $state(false);
   let selected = $state<string | null>(null);
   let selectedName = $derived(selected ? (selected.split(/[\\/]/).pop() ?? selected) : "");
   let confirmDelete = $state<string | null>(null);
+  let starting = $state(false);
 
   const exts = $derived(app.info?.extensions ?? []);
 
@@ -42,31 +43,54 @@
   });
 
   async function pick() {
-    const res = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "Аудио и видео", extensions: exts }],
-    });
-    if (typeof res === "string" && accept(res)) selected = res;
+    try {
+      const res = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Аудио и видео", extensions: exts }],
+      });
+      if (typeof res === "string" && accept(res)) selected = res;
+    } catch (e) {
+      toast(String(e), "error");
+    }
   }
 
   async function go() {
-    if (!selected || !app.settings) return;
-    await saveSettings();
-    if (!modelInstalled(app.settings.quality)) {
-      toast("Сначала нужно скачать модель для этого режима");
-      app.settingsSection = "models";
-      app.settingsOpen = true;
-      startDownload([app.settings.quality]);
-      return;
+    if (!selected || !app.settings || starting) return;
+    starting = true;
+    try {
+      await saveSettings();
+      if (!modelInstalled(app.settings.quality)) {
+        toast("Сначала нужно скачать модель для этого режима");
+        app.settingsSection = "models";
+        app.settingsOpen = true;
+        await startDownload([app.settings.quality]);
+        return;
+      }
+      await startJob(selected);
+    } catch (e) {
+      toast(String(e), "error");
+    } finally {
+      starting = false;
     }
-    startJob(selected);
   }
 
   async function remove(id: string) {
-    await api.deleteProject(id);
-    confirmDelete = null;
-    await refreshRecent();
+    try {
+      await api.deleteProject(id);
+      confirmDelete = null;
+      await refreshRecent();
+    } catch (e) {
+      toast(String(e), "error");
+    }
+  }
+
+  function openFromKeyboard(e: KeyboardEvent, id: string) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openProject(id);
+    }
   }
 
   function iconFor(fmt: string) {
@@ -85,7 +109,7 @@
       onclick={pick}
       aria-label="Выбрать файл"
     >
-      <img class="illustration" src={emptyArt} alt="" draggable="false" />
+      <FileBadge size={72} />
       {#if selected}
         <div class="title">{selectedName}</div>
         <div class="muted small">Файл выбран. Нажмите «Расшифровать» или выберите другой.</div>
@@ -127,7 +151,7 @@
       </div>
     {/if}
 
-    <button class="btn primary big go" disabled={!selected} onclick={go}>Расшифровать</button>
+    <button class="btn primary big go" disabled={!selected || starting} onclick={go}>{starting ? "Подготавливаем…" : "Расшифровать"}</button>
     <div class="center">
       <span class="badge-offline"><Icon name="shield" size={16} /> Работает офлайн, ваши записи никуда не отправляются</span>
     </div>
@@ -146,7 +170,7 @@
         </div>
         <div class="tbody">
           {#each app.recent as r (r.id)}
-            <div class="tr" role="button" tabindex="0" onclick={() => openProject(r.id)} onkeydown={(e) => e.key === "Enter" && openProject(r.id)}>
+            <div class="tr" role="button" tabindex="0" onclick={() => openProject(r.id)} onkeydown={(e) => openFromKeyboard(e, r.id)}>
               <span class="name"><span class="ficon"><Icon name={iconFor(r.format)} size={15} /></span><span class="ellipsis">{r.name}</span></span>
               <span class="muted">{date(r.created_at)}</span>
               <span class="muted r">{duration(r.duration_ms)}</span>
@@ -182,7 +206,7 @@
   }
   .drop {
     flex: 1;
-    min-height: 220px;
+    min-height: 240px;
     border: 1.5px dashed color-mix(in srgb, var(--primary) 45%, var(--border-strong));
     border-radius: 14px;
     background: color-mix(in srgb, var(--primary) 4%, var(--card));
@@ -200,11 +224,6 @@
     background: color-mix(in srgb, var(--primary) 9%, var(--card));
     border-color: var(--primary);
   }
-  .drop img {
-    width: min(260px, 70%);
-    height: auto;
-    pointer-events: none;
-  }
   .title {
     font-size: 17px;
     font-weight: 600;
@@ -217,9 +236,11 @@
   .pick {
     margin-top: 4px;
     min-width: 200px;
+    flex-shrink: 0;
   }
   .formats {
     font-size: 12.5px;
+    flex-shrink: 0;
   }
   .form {
     display: flex;
@@ -248,6 +269,7 @@
   }
   .go {
     width: 100%;
+    flex-shrink: 0;
   }
   .center {
     display: flex;
@@ -279,7 +301,7 @@
   .thead,
   .tr {
     display: grid;
-    grid-template-columns: 1fr 96px 100px 44px;
+    grid-template-columns: minmax(0, 1fr) 84px 78px 36px;
     align-items: center;
     gap: 8px;
     padding: 0 8px;
@@ -307,7 +329,8 @@
   .tr .del {
     opacity: 0;
   }
-  .tr:hover .del {
+  .tr:hover .del,
+  .tr:focus-within .del {
     opacity: 1;
   }
   .name {

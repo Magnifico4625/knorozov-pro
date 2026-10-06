@@ -14,7 +14,9 @@ use anyhow::{bail, Context, Result};
 use knorozov_core::{asr, audio, export, models, pipeline};
 
 fn arg_value(args: &[String], name: &str) -> Option<String> {
-    args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i + 1).cloned())
 }
 
 fn main() -> Result<()> {
@@ -23,9 +25,22 @@ fn main() -> Result<()> {
         Some("transcribe") | Some("export") => {
             let is_export = args[1] == "export";
             let (model, input) = if is_export {
-                (PathBuf::from(&args[3]), PathBuf::from(&args[2]))
+                (
+                    PathBuf::from(args.get(3).context("model")?),
+                    PathBuf::from(args.get(2).context("audio")?),
+                )
             } else {
-                (PathBuf::from(args.get(2).context("model")?), PathBuf::from(args.get(3).context("audio")?))
+                (
+                    PathBuf::from(args.get(2).context("model")?),
+                    PathBuf::from(args.get(3).context("audio")?),
+                )
+            };
+            let out = if is_export {
+                Some(PathBuf::from(
+                    args.get(4).context("output: file.docx|pdf|txt|srt")?,
+                ))
+            } else {
+                None
             };
             let lang = arg_value(&args, "--lang").unwrap_or_else(|| "auto".into());
             let threads = arg_value(&args, "--threads").and_then(|t| t.parse().ok());
@@ -43,9 +58,15 @@ fn main() -> Result<()> {
                 embedding_model: diar,
                 threads,
             };
-            let (tr, stats) = pipeline::run(&engine, &pcm, &opts, |_| {}, |_| {}, Arc::new(AtomicBool::new(false)))?;
-            if is_export {
-                let out = PathBuf::from(&args[4]);
+            let (tr, stats) = pipeline::run(
+                &engine,
+                &pcm,
+                &opts,
+                |_| {},
+                |_| {},
+                Arc::new(AtomicBool::new(false)),
+            )?;
+            if let Some(out) = out {
                 let fmt = match out.extension().and_then(|e| e.to_str()) {
                     Some("docx") => export::ExportFormat::Docx,
                     Some("pdf") => export::ExportFormat::Pdf,
@@ -99,7 +120,11 @@ fn main() -> Result<()> {
             let mirror = arg_value(&args, "--mirror").unwrap_or_default();
             let cancel = AtomicBool::new(false);
             let p = models::download(&dir, q, &mirror, &cancel, |p| {
-                eprint!("\r{:.1}% {:.1} MB/s   ", p.downloaded as f64 * 100.0 / p.total as f64, p.speed / 1e6);
+                eprint!(
+                    "\r{:.1}% {:.1} MB/s   ",
+                    p.downloaded as f64 * 100.0 / p.total as f64,
+                    p.speed / 1e6
+                );
             })?;
             eprintln!();
             println!("{}", p.display());

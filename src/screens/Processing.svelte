@@ -43,7 +43,7 @@
 
 <div class="wrap">
   <section class="card top">
-    <FileBadge size={64} />
+    <div class="file-icon"><FileBadge size={64} /></div>
     <div class="info">
       <div class="name" title={app.file?.name}>{app.file?.name ?? "Файл"}</div>
       <div class="muted meta">
@@ -94,6 +94,16 @@
     flex: 1;
     min-width: 0;
   }
+  .file-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 96px;
+    height: 96px;
+    border-radius: 12px;
+    background: var(--card-2);
+  }
   .name {
     font-size: 19px;
     font-weight: 600;
@@ -134,7 +144,9 @@
     color: var(--muted);
     user-select: text;
     -webkit-user-select: text;
-    padding-right: 6px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
   }
   .text .latest {
     color: var(--text);

@@ -6,13 +6,17 @@
 
 ## Где взять файлы
 
-Откройте репозиторий на GitHub → вкладка **Actions** → последний зелёный запуск **CI** → внизу раздел
-**Artifacts**:
+Откройте [Releases](https://github.com/Magnifico4625/knorozov-pro/releases), выберите опубликованную версию
+и скачайте файл из раздела **Assets**:
 
-* `Knorozov-PRO-windows-x64` → внутри `Knorozov-PRO_0.1.0_Windows-x64-setup.exe`
-* `Knorozov-PRO-macos-arm64` → внутри `Knorozov-PRO_0.1.0_macOS-arm64.dmg` и `…pkg`
+* Windows x64: `Knorozov-PRO_<версия>_Windows-x64-setup.exe`.
+* Mac с Apple Silicon: `Knorozov-PRO_<версия>_macOS-arm64.dmg` или `Knorozov-PRO_<версия>_macOS-arm64.pkg`.
 
-Скачанный артефакт — это zip-архив; распакуйте его.
+Файл `SHA256SUMS.txt` содержит контрольные суммы установщиков. Если опубликованных версий пока нет,
+проверочные сборки можно скачать в **Actions → последний зелёный запуск CI → Artifacts**:
+`Knorozov-PRO-windows-x64` или `Knorozov-PRO-macos-arm64`.
+Для скачивания артефактов нужна учётная запись GitHub; они хранятся 30 дней и скачиваются в zip-архиве,
+который нужно распаковать. Черновик Release становится доступен пользователям после публикации владельцем.
 
 ## Windows 10/11
 

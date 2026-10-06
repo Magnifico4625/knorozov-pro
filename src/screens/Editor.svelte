@@ -22,6 +22,15 @@
   let playing = $state(false);
   let player: Player | undefined = $state();
   let list: HTMLDivElement | undefined = $state();
+  let pendingEdits = $state<Record<number, string>>({});
+  let saveError = $state("");
+  let saving = $state(0);
+  let saveQueue: Promise<void> = Promise.resolve();
+  let saveRevision = 0;
+  // A newer edit may repeat an older value; only its own save can clear the draft.
+  const latestSave: Record<number, number> = {};
+  let renameSaving = false;
+  const hasPendingEdits = $derived(Object.keys(pendingEdits).length > 0);
 
   onMount(async () => {
     try {
@@ -97,16 +106,50 @@
   });
 
   // ----- editing -----
+  function queueSave(id: number, text: string) {
+    const revision = ++saveRevision;
+    latestSave[id] = revision;
+    saving += 1;
+    saveQueue = saveQueue.then(async () => {
+      try {
+        await api.updateParagraph(project!.id, id, text);
+        if (latestSave[id] === revision) {
+          delete pendingEdits[id];
+          delete latestSave[id];
+        }
+        if (!Object.keys(pendingEdits).length) saveError = "";
+      } catch (e) {
+        saveError = String(e);
+        toast("Не удалось сохранить правки. Текст остаётся в редакторе — повторите сохранение.", "error");
+      } finally {
+        saving -= 1;
+      }
+    });
+    return saveQueue;
+  }
+
   async function commitText(p: Paragraph, el: HTMLElement) {
     const text = el.innerText.replace(/\s+\n/g, "\n").trim();
     if (text === p.text) return;
     p.text = text;
     p.edited = true;
-    try {
-      await api.updateParagraph(project!.id, p.id, text);
-    } catch (e) {
-      toast(String(e), "error");
-    }
+    pendingEdits[p.id] = text;
+    await queueSave(p.id, text);
+  }
+
+  async function retrySave() {
+    await Promise.all(Object.entries(pendingEdits).map(([id, text]) => queueSave(Number(id), text)));
+  }
+
+  async function flushEdits() {
+    await saveQueue;
+    if (!Object.keys(pendingEdits).length) return true;
+    toast("Сначала сохраните правки: нажмите «Повторить сохранение».", "error");
+    return false;
+  }
+
+  export async function leave() {
+    if (await flushEdits()) app.screen = "main";
   }
 
   function startRename(p: Paragraph) {
@@ -117,14 +160,18 @@
     tick().then(() => (document.querySelector(".rename input") as HTMLInputElement | null)?.focus());
   }
   async function commitRename() {
-    if (!renaming || !project) return;
+    if (!renaming || !project || renameSaving) return;
+    renameSaving = true;
     const name = nameDraft.trim() || defaultName(renaming.index);
     try {
+      if (!await flushEdits()) return;
       project.transcript = await api.renameSpeaker(project.id, renaming.index, name);
+      renaming = null;
     } catch (e) {
       toast(String(e), "error");
+    } finally {
+      renameSaving = false;
     }
-    renaming = null;
   }
   function defaultName(i: number) {
     return `Спикер ${i + 1}`;
@@ -132,6 +179,7 @@
 
   // ----- actions -----
   async function copyAll() {
+    if (!await flushEdits()) return;
     try {
       await writeText(await api.projectText(project!.id));
       toast("Текст скопирован в буфер обмена");
@@ -147,6 +195,7 @@
   ];
   async function doExport(f: ExportFormat, name: string) {
     exportOpen = false;
+    if (!await flushEdits()) return;
     try {
       const defaultPath = await api.defaultExportPath(project!.id, f);
       const path = await save({ defaultPath, filters: [{ name, extensions: [f] }] });
@@ -169,14 +218,22 @@
 
   function onKey(e: KeyboardEvent) {
     const t = e.target as HTMLElement;
-    if (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
-    if (e.code === "Space") {
-      e.preventDefault();
-      player?.toggle();
+    if (app.settingsOpen || app.aboutOpen) return;
+    if (e.key === "Escape") {
+      exportOpen = false;
+      menuFor = null;
+      renaming = null;
+      return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
       e.preventDefault();
       (document.querySelector(".search input") as HTMLInputElement | null)?.focus();
+      return;
+    }
+    if (t.isContentEditable || t.closest("button, input, textarea, select, a, [role='button']")) return;
+    if (e.code === "Space") {
+      e.preventDefault();
+      player?.toggle();
     }
   }
   function closeMenus(e: MouseEvent) {
@@ -196,7 +253,7 @@
 {:else if project}
   <div class="wrap">
     <div class="toolbar">
-      <button class="btn ghost icon" title="Назад" onclick={() => (app.screen = "main")}><Icon name="arrowLeft" /></button>
+      <button class="btn ghost icon" title="Назад" onclick={leave}><Icon name="arrowLeft" /></button>
       <div class="search">
         <Icon name="search" size={16} />
         <input class="input" placeholder="Поиск по тексту" bind:value={query} onkeydown={(e) => e.key === "Enter" && gotoMatch(e.shiftKey ? -1 : 1)} />
@@ -213,16 +270,27 @@
       {/if}
       <button class="btn" onclick={copyAll}><Icon name="copy" size={16} /> Копировать всё</button>
       <div class="export">
-        <button class="btn primary" onclick={() => (exportOpen = !exportOpen)}>Экспорт <Icon name="chevronDown" size={16} /></button>
+        <button class="btn primary" aria-expanded={exportOpen} onclick={() => (exportOpen = !exportOpen)}>Экспорт <Icon name="chevronDown" size={16} /></button>
         {#if exportOpen}
           <div class="menu card">
             {#each formats as x (x.f)}
-              <button onclick={() => doExport(x.f, x.name)}><span class="ficon">{x.f.toUpperCase()}</span>{x.label}</button>
+              <button onclick={() => doExport(x.f, x.name)}><span class="ficon" aria-hidden="true">{x.f.toUpperCase()}</span>{x.label}</button>
             {/each}
           </div>
         {/if}
       </div>
     </div>
+
+    {#if hasPendingEdits}
+      <div class="save-state" role="status">
+        {#if saving}
+          <span class="muted">Сохраняем правки…</span>
+        {:else if saveError}
+          <span>Правки ещё не сохранены. Повторите сохранение перед экспортом или выходом.</span>
+          <button class="btn" onclick={retrySave}>Повторить сохранение</button>
+        {/if}
+      </div>
+    {/if}
 
     <div class="doc-head">
       <div class="dtitle">{project.name}</div>
@@ -314,6 +382,15 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+  }
+  .save-state {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--danger);
   }
   .search {
     position: relative;

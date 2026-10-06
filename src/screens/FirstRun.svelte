@@ -46,10 +46,10 @@
   }
 </script>
 
-<div class="grid">
-  <section class="card main">
+<div class="grid card">
+  <section class="main">
     <img class="illustration art" src={art} alt="" draggable="false" />
-    <h1>Скачиваем модель распознавания<br /><span>(~500 МБ – 1,5 ГБ)</span></h1>
+    <h1>Скачиваем модели распознавания<br /><span>({mb(queueTotal)})</span></h1>
 
     {#if app.download.error}
       <div class="error">
@@ -89,7 +89,7 @@
     <span class="badge-offline"><Icon name="shield" size={16} /> Работает офлайн, ваши записи никуда не отправляются</span>
   </section>
 
-  <aside class="card side">
+  <aside class="side">
     <h3><Icon name="gear" size={18} /> Настройки</h3>
     <button class="item" onclick={() => openSettings("folder")}><Icon name="folder" /> <span>папка для сохранения</span> <Icon name="chevronRight" size={16} /></button>
     <button class="item" onclick={() => openSettings("models")}><Icon name="download" /> <span>загрузка моделей</span> <Icon name="chevronRight" size={16} /></button>
@@ -102,7 +102,7 @@
     height: 100%;
     display: grid;
     grid-template-columns: 1fr 300px;
-    gap: 18px;
+    overflow: hidden;
   }
   .main {
     display: flex;
@@ -115,7 +115,7 @@
     overflow: auto;
   }
   .art {
-    width: min(300px, 60%);
+    width: min(160px, 40%);
     height: auto;
   }
   h1 {
@@ -161,7 +161,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    align-self: start;
+    border-left: 1px solid var(--border);
   }
   h3 {
     display: flex;

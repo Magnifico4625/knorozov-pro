@@ -5,6 +5,7 @@
   import { api, type Quality } from "../lib/api";
   import { app, applyTheme, refreshModels, saveSettings, startDownload, toast } from "../lib/state.svelte";
   import { mb, speed } from "../lib/format";
+  import { modalDialog } from "../lib/dialog";
 
   let mirrorDraft = $state(app.settings?.mirror ?? "");
   const presets = [
@@ -57,7 +58,7 @@
 </script>
 
 <div class="backdrop" role="presentation" onclick={close}></div>
-<div class="panel card" role="dialog" aria-label="Настройки">
+<div class="panel card" role="dialog" aria-modal="true" aria-label="Настройки" tabindex="-1" use:modalDialog={close}>
   <div class="head">
     <h2><Icon name="gear" size={18} /> Настройки</h2>
     <button class="btn ghost icon" onclick={close} title="Закрыть"><Icon name="x" /></button>

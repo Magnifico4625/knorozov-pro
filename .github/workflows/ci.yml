@@ -3,9 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
     inputs:
+      release:
+        description: "Create or update a draft Release with Windows/macOS installers (main only)"
+        type: boolean
+        default: false
       bench:
         description: "Run Быстро/Точно benchmarks (downloads ~760 MB of models)"
         type: boolean
@@ -15,6 +20,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
@@ -23,12 +31,18 @@ jobs:
   checks:
     name: Lint + unit tests (Linux)
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
+      - name: Verify application and tag versions
+        id: version
+        run: node scripts/release-version.mjs
       - run: pnpm install --frozen-lockfile
       - name: Typecheck (svelte-check)
         run: pnpm check
@@ -39,8 +53,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: linux }
-      - name: Rust unit tests (core: exporters, SRT timing, speaker rename, clustering…)
-        run: cargo test -p knorozov-core --lib
+      - name: "Rust unit tests (core: exporters, SRT timing, speaker rename, clustering…)"
+        run: cargo test --locked -p knorozov-core --lib
 
   build:
     name: Build + test (${{ matrix.name }})
@@ -53,7 +67,7 @@ jobs:
             os: windows-latest
             slug: windows-x64
           - name: macOS Apple Silicon
-            os: macos-latest
+            os: macos-15
             slug: macos-arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -69,6 +83,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "${{ matrix.slug }}" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
@@ -81,14 +97,26 @@ jobs:
         run: |
           mkdir -p models
           if [ ! -f models/ggml-tiny.bin ]; then
-            curl -fL --retry 5 -o models/ggml-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+            curl -fL --proto '=https' --proto-redir '=https' --retry 5 -o models/ggml-tiny.bin.part https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+            mv models/ggml-tiny.bin.part models/ggml-tiny.bin
           fi
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          model = Path("models/ggml-tiny.bin")
+          expected = "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21"
+          actual = hashlib.file_digest(model.open("rb"), "sha256").hexdigest()
+          if actual != expected:
+              model.unlink()
+              raise SystemExit("Tiny model SHA-256 mismatch; removed invalid cached model")
+          print("Tiny model SHA-256 verified")
+          PY
 
       - name: Rust tests (unit + RU/EN transcription + diarization, tiny model)
         env:
           KNOROZOV_TEST_MODEL: ${{ github.workspace }}/models/ggml-tiny.bin
           KNOROZOV_REQUIRE_MODEL: "1"
-        run: cargo test --release -p knorozov-core -p knorozov-pro -- --nocapture
+        run: cargo test --locked --release -p knorozov-core -p knorozov-pro -- --nocapture
 
       - name: Build installer (Windows NSIS)
         if: runner.os == 'Windows'
@@ -99,9 +127,13 @@ jobs:
       - name: Build PKG (macOS)
         if: runner.os == 'macOS'
         run: |
-          APP=$(ls -d target/release/bundle/macos/*.app | head -1)
-          pkgbuild --install-location /Applications --component "$APP" \
-            --identifier pro.knorozov.app --version 0.1.0 target/release/bundle/Knorozov-PRO.pkg
+          test "$(uname -m)" = "arm64"
+          APP=(target/release/bundle/macos/*.app)
+          test "${#APP[@]}" = 1
+          VER=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          test -d "${APP[0]}"
+          pkgbuild --install-location /Applications --component "${APP[0]}" \
+            --identifier pro.knorozov.app --version "$VER" target/release/bundle/Knorozov-PRO.pkg
 
       - name: Collect artifacts
         run: |
@@ -134,7 +166,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.bench
         run: |
           FEAT=""; if [ "$RUNNER_OS" = "macOS" ]; then FEAT="--features metal"; fi
-          cargo build --release -p knorozov-cli $FEAT
+          cargo build --locked --release -p knorozov-cli $FEAT
           CLI=target/release/knorozov-cli
           $CLI download fast models
           $CLI download accurate models
@@ -149,3 +181,58 @@ jobs:
         with:
           name: bench-${{ matrix.slug }}
           path: bench-*
+
+  release:
+    name: Draft Release with installers
+    needs: [checks, build]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.checks.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.checks.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Protect published releases and existing tags
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
+            if (releases.some(release => release.tag_name === tag && !release.draft)) {
+              throw new Error(`${tag} is already published. Bump the application version to create a new release.`);
+            }
+            try {
+              const { data } = await github.rest.repos.getCommit({ ...context.repo, ref: tag });
+              if (data.sha !== context.sha) throw new Error(`${tag} points to another commit. Create a new version.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Knorozov-PRO-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify installer set and generate SHA-256 sums
+        working-directory: release-assets
+        shell: bash
+        run: |
+          test -s "Knorozov-PRO_${RELEASE_VERSION}_Windows-x64-setup.exe"
+          test -s "Knorozov-PRO_${RELEASE_VERSION}_macOS-arm64.dmg"
+          test -s "Knorozov-PRO_${RELEASE_VERSION}_macOS-arm64.pkg"
+          sha256sum *.exe *.dmg *.pkg > SHA256SUMS.txt
+      - name: Create or update the draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Кнорозов PRO ${{ env.RELEASE_VERSION }}
+          draft: true
+          fail_on_unmatched_files: true
+          body_path: docs/release-notes.md
+          files: |
+            release-assets/*.exe
+            release-assets/*.dmg
+            release-assets/*.pkg
+            release-assets/SHA256SUMS.txt
