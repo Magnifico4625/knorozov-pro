@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      bench:
+        description: "Run Быстро/Точно benchmarks (downloads ~760 MB of models)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  checks:
+    name: Lint + unit tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck (svelte-check)
+        run: pnpm check
+      - name: ESLint
+        run: pnpm lint
+      - name: Frontend build
+        run: pnpm build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: linux }
+      - name: Rust unit tests (core: exporters, SRT timing, speaker rename, clustering…)
+        run: cargo test -p knorozov-core --lib
+
+  build:
+    name: Build + test (${{ matrix.name }})
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            slug: windows-x64
+          - name: macOS Apple Silicon
+            os: macos-latest
+            slug: macos-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "${{ matrix.slug }}" }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Cache test model (ggml-tiny)
+        uses: actions/cache@v4
+        with:
+          path: models/ggml-tiny.bin
+          key: model-tiny-v1
+      - name: Download test model
+        run: |
+          mkdir -p models
+          if [ ! -f models/ggml-tiny.bin ]; then
+            curl -fL --retry 5 -o models/ggml-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          fi
+
+      - name: Rust tests (unit + RU/EN transcription + diarization, tiny model)
+        env:
+          KNOROZOV_TEST_MODEL: ${{ github.workspace }}/models/ggml-tiny.bin
+          KNOROZOV_REQUIRE_MODEL: "1"
+        run: cargo test --release -p knorozov-core -p knorozov-pro -- --nocapture
+
+      - name: Build installer (Windows NSIS)
+        if: runner.os == 'Windows'
+        run: pnpm tauri build --bundles nsis
+      - name: Build app + DMG (macOS)
+        if: runner.os == 'macOS'
+        run: pnpm tauri build --bundles app,dmg
+      - name: Build PKG (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          APP=$(ls -d target/release/bundle/macos/*.app | head -1)
+          pkgbuild --install-location /Applications --component "$APP" \
+            --identifier pro.knorozov.app --version 0.1.0 target/release/bundle/Knorozov-PRO.pkg
+
+      - name: Collect artifacts
+        run: |
+          VER=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p out
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp target/release/bundle/nsis/*.exe "out/Knorozov-PRO_${VER}_Windows-x64-setup.exe"
+          else
+            cp target/release/bundle/dmg/*.dmg "out/Knorozov-PRO_${VER}_macOS-arm64.dmg"
+            cp target/release/bundle/Knorozov-PRO.pkg "out/Knorozov-PRO_${VER}_macOS-arm64.pkg"
+          fi
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Knorozov-PRO-${{ matrix.slug }}
+          path: out/*
+          retention-days: 30
+          if-no-files-found: error
+
+      # ---------- optional benchmark (manual run with bench=true) ----------
+      - name: Cache benchmark models
+        if: github.event_name == 'workflow_dispatch' && inputs.bench
+        uses: actions/cache@v4
+        with:
+          path: |
+            models/ggml-small-q5_1.bin
+            models/ggml-large-v3-turbo-q5_0.bin
+          key: model-bench-v1
+      - name: Benchmark Быстро / Точно
+        if: github.event_name == 'workflow_dispatch' && inputs.bench
+        run: |
+          FEAT=""; if [ "$RUNNER_OS" = "macOS" ]; then FEAT="--features metal"; fi
+          cargo build --release -p knorozov-cli $FEAT
+          CLI=target/release/knorozov-cli
+          $CLI download fast models
+          $CLI download accurate models
+          echo "runner: ${{ matrix.os }} / $(uname -m) / cores: $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo $NUMBER_OF_PROCESSORS)" | tee bench-${{ matrix.slug }}.txt
+          for m in ggml-small-q5_1.bin ggml-large-v3-turbo-q5_0.bin; do
+            for f in ru_120s.mp3 en_120s.mp3; do
+              $CLI transcribe models/$m tests/bench/$f --json | tee -a bench-${{ matrix.slug }}.jsonl
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.bench
+        with:
+          name: bench-${{ matrix.slug }}
+          path: bench-*
