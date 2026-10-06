@@ -1,0 +1,39 @@
+[package]
+name = "knorozov-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = ["diarization"]
+diarization = ["dep:sherpa-rs"]
+metal = ["whisper-rs/metal"]
+
+[dependencies]
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+whisper-rs = "0.16"
+symphonia = { version = "0.6", default-features = false, features = ["mp3", "aac", "isomp4", "wav", "pcm", "ogg", "vorbis", "flac", "adpcm", "alac", "caf", "mkv"] }
+symphonia-adapter-libopus = "0.3"
+rubato = "0.16"
+docx-rs = "0.4"
+krilla = "0.8"
+ttf-parser = "0.25"
+ureq = "3"
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries"], optional = true }
+
+# Static sherpa-onnx/onnxruntime on the shipping platforms (no extra DLL/dylib to bundle).
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries", "static"], optional = true }
+
+[dev-dependencies]
+pdf-extract = "0.12"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tempfile = "3"
