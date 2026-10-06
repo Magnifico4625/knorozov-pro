@@ -1,0 +1,255 @@
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: block;
+}
+
+:root {
+  --bg: #f3f5f8;
+  --card: #ffffff;
+  --card-2: #f8fafc;
+  --border: #e5e8ee;
+  --border-strong: #d5dae3;
+  --text: #111827;
+  --text-2: #374151;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --primary: #2f7bf6;
+  --primary-2: #1f66e0;
+  --primary-soft: #eaf2ff;
+  --primary-text: #1d5fd1;
+  --green-bg: #ecfdf3;
+  --green-border: #c6f0d6;
+  --green-text: #15803d;
+  --danger: #dc2626;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 12px 40px rgba(16, 24, 40, 0.16);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --mark: #fde68a;
+  --active-para: #f2f7ff;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #121418;
+  --card: #1b1e24;
+  --card-2: #20242b;
+  --border: #2b3038;
+  --border-strong: #3a404a;
+  --text: #eceff3;
+  --text-2: #cfd4db;
+  --muted: #9aa3ae;
+  --faint: #6b7380;
+  --primary: #3d86ff;
+  --primary-2: #2f74ea;
+  --primary-soft: #1c2a42;
+  --primary-text: #8db8ff;
+  --green-bg: #12261b;
+  --green-border: #1f4d31;
+  --green-text: #5fd68f;
+  --mark: #7a5d12;
+  --active-para: #1d2636;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--card);
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--card-2);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn.primary {
+  background: linear-gradient(180deg, #4a90ff 0%, var(--primary) 55%, var(--primary-2) 100%);
+  border-color: var(--primary-2);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(31, 102, 224, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn.primary:hover {
+  filter: brightness(1.05);
+}
+.btn.big {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 12px;
+}
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.btn.ghost:hover {
+  background: var(--card-2);
+}
+.btn.icon {
+  width: 34px;
+  padding: 0;
+}
+.btn.danger {
+  color: var(--danger);
+}
+
+.input,
+.select {
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--card);
+  padding: 0 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.input:focus,
+.select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.segmented {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+.segmented button {
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-2);
+  padding: 0 16px;
+}
+.segmented button.on {
+  background: linear-gradient(180deg, #4a90ff, var(--primary));
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(31, 102, 224, 0.35);
+}
+
+.badge-offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  color: var(--green-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--primary) 14%, var(--card-2));
+  overflow: hidden;
+}
+.progress > div {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #5b9cff, var(--primary));
+  transition: width 0.4s ease;
+}
+
+.muted {
+  color: var(--muted);
+}
+.faint {
+  color: var(--faint);
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  margin: 0;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+:root[data-theme="dark"] .illustration {
+  filter: brightness(1.7) saturate(1.1);
+}

@@ -1,0 +1,20 @@
+// Third-party components shipped in the app (keep in sync with THIRD_PARTY_LICENSES.md).
+export const LICENSES: { name: string; license: string; url: string; note?: string }[] = [
+  { name: "Tauri", license: "MIT / Apache-2.0", url: "https://tauri.app" },
+  { name: "whisper.cpp / ggml", license: "MIT", url: "https://github.com/ggml-org/whisper.cpp" },
+  { name: "whisper-rs", license: "Unlicense", url: "https://codeberg.org/tazz4843/whisper-rs" },
+  { name: "Модели OpenAI Whisper (ggml)", license: "MIT", url: "https://huggingface.co/ggerganov/whisper.cpp", note: "скачиваются при первом запуске" },
+  { name: "sherpa-onnx", license: "Apache-2.0", url: "https://github.com/k2-fsa/sherpa-onnx" },
+  { name: "sherpa-rs", license: "MIT", url: "https://github.com/thewh1teagle/sherpa-rs" },
+  { name: "ONNX Runtime", license: "MIT", url: "https://github.com/microsoft/onnxruntime" },
+  { name: "3D-Speaker CAM++ (модель спикеров)", license: "Apache-2.0", url: "https://github.com/modelscope/3D-Speaker" },
+  { name: "Symphonia", license: "MPL-2.0", url: "https://github.com/pdeljanov/Symphonia", note: "без изменений исходного кода" },
+  { name: "libopus / opusic-sys", license: "BSD-3-Clause", url: "https://opus-codec.org" },
+  { name: "symphonia-adapter-libopus", license: "MIT / Apache-2.0", url: "https://github.com/aschey/symphonia-adapters" },
+  { name: "Rubato", license: "MIT", url: "https://github.com/HEnquist/rubato" },
+  { name: "docx-rs", license: "MIT", url: "https://github.com/bokuweb/docx-rs" },
+  { name: "krilla", license: "MIT / Apache-2.0", url: "https://github.com/LaurenzV/krilla" },
+  { name: "ureq, rustls", license: "MIT / Apache-2.0 / ISC", url: "https://github.com/algesten/ureq" },
+  { name: "Шрифт Inter", license: "SIL OFL 1.1", url: "https://rsms.me/inter/" },
+  { name: "Svelte", license: "MIT", url: "https://svelte.dev" },
+];
